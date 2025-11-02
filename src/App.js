@@ -10,6 +10,7 @@ const VibeCareerMatcher = () => {
   const [jobs, setJobs] = useState({});
   const [loadingJobs, setLoadingJobs] = useState({});
   const [userLocation, setUserLocation] = useState('');
+  const [userEmail, setUserEmail] = useState('');
 
   const vibeQuestions = [
     {
@@ -117,8 +118,11 @@ const VibeCareerMatcher = () => {
         setCurrentQuestion(currentQuestion + 1);
         setSelectedCard(null);
       } else {
-        calculateMatches(newScores);
+        const matches = calculateMatches(newScores);
         setStep('results');
+        if (userEmail) {
+          sendResultsEmail(newScores, matches);
+        }
       }
     }, 400);
   };
@@ -138,16 +142,23 @@ const VibeCareerMatcher = () => {
       return { ...career, matchScore: normalizedScore, matchPercent: Math.max(0, Math.min(100, 100 - normalizedScore)) };
     });
     matches.sort((a, b) => b.matchPercent - a.matchPercent);
-    setCareerMatches(matches.slice(0, 6));
+    const topMatches = matches.slice(0, 6);
+    setCareerMatches(topMatches);
+    return topMatches;
   };
 
   const fetchJobs = async (careerTitle, searchTerms) => {
     setLoadingJobs(prev => ({ ...prev, [careerTitle]: true }));
     try {
+      const locationToSend = userLocation.trim() || 'United States';
       const response = await fetch('http://localhost:5001/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: careerTitle, search_terms: searchTerms, location: userLocation || 'United States' })
+        body: JSON.stringify({ 
+          title: careerTitle, 
+          search_terms: searchTerms, 
+          location: locationToSend 
+        })
       });
       const data = await response.json();
       setJobs(prev => ({ ...prev, [careerTitle]: data.jobs || [] }));
@@ -164,6 +175,27 @@ const VibeCareerMatcher = () => {
     window.open(`https://www.indeed.com/jobs?q=${query}`, '_blank');
   };
 
+  const sendResultsEmail = async (scores, matches) => {
+    try {
+      await fetch('http://localhost:5001/api/send-results', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userEmail,
+          vibeScores: scores,
+          topMatches: matches.slice(0, 3).map(c => ({
+            title: c.title,
+            matchPercent: Math.round(c.matchPercent),
+            industry: c.industry
+          }))
+        })
+      });
+      console.log('Results sent to email!');
+    } catch (error) {
+      console.error('Failed to send email:', error);
+    }
+  };
+
   if (step === 'intro') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center p-4">
@@ -171,7 +203,22 @@ const VibeCareerMatcher = () => {
           <div className="flex justify-center mb-6"><Sparkles className="w-16 h-16 text-purple-600" /></div>
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">Find Your Vibe Career</h1>
           <p className="text-lg text-gray-600 mb-6">Answer questions about your aesthetic and lifestyle preferences, and we'll match you with careers that align with your unique vibe.</p>
-          <div className="mb-8"><input type="text" placeholder="Your location (optional, e.g., New York, NY)" value={userLocation} onChange={(e) => setUserLocation(e.target.value)} className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-center" /></div>
+          <div className="mb-8 space-y-4">
+            <input
+              type="email"
+              placeholder="Your email (optional, to receive results)"
+              value={userEmail}
+              onChange={(e) => setUserEmail(e.target.value)}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-center"
+            />
+            <input
+              type="text"
+              placeholder="Your location (optional, e.g., New York, NY)"
+              value={userLocation}
+              onChange={(e) => setUserLocation(e.target.value)}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-center"
+            />
+          </div>
           <button onClick={() => setStep('quiz')} className="bg-gradient-to-r from-purple-600 to-pink-500 text-white px-8 py-4 rounded-full text-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center gap-2 mx-auto">Start Your Journey<ArrowRight className="w-5 h-5" /></button>
         </div>
       </div>
@@ -215,6 +262,7 @@ const VibeCareerMatcher = () => {
               <div className="flex justify-center mb-4"><Briefcase className="w-16 h-16 text-purple-600" /></div>
               <h1 className="text-4xl font-bold text-gray-900 mb-4">Your Perfect Career Matches</h1>
               <p className="text-lg text-gray-600">Based on your vibe, here are careers tailored just for you</p>
+              {userEmail && <p className="text-sm text-purple-600 mt-2">✓ Results sent to {userEmail}</p>}
             </div>
             <div className="space-y-6">
               {careerMatches.map((career, idx) => (
