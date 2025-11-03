@@ -151,7 +151,7 @@ const VibeCareerMatcher = () => {
     setLoadingJobs(prev => ({ ...prev, [careerTitle]: true }));
     try {
       const locationToSend = userLocation.trim() || 'United States';
-      const response = await fetch('http://localhost:5001/api/jobs', {
+      const response = await fetch('https://vibe-career-backend.onrender.com/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -177,7 +177,7 @@ const VibeCareerMatcher = () => {
 
   const sendResultsEmail = async (scores, matches) => {
     try {
-      await fetch('http://localhost:5001/api/send-results', {
+      await fetch('https://vibe-career-backend.onrender.com/api/send-results', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
